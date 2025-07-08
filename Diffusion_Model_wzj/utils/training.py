@@ -118,12 +118,24 @@ class Trainer:
             x_t, noise = self.diffusion.noise_motion(traj_dct, t)
             predicted_noise = self.model(x_t, t, mod=traj_dct_mod)
 
-            # 修改：loss乘了一个系数
-            loss = self.criterion(predicted_noise, noise)
-            loss = loss * traj_conf.mean()  # 修改：乘了一个conf的平均值的系数
+            # 损失函数一：DCT后的全时间序列
+            loss1 = self.criterion(predicted_noise, noise)
+
+            # 损失函数二：iDCT后的未来部分
+            predicted_noise_est = torch.matmul(self.cfg.idct_m_all[:, :self.cfg.n_pre], predicted_noise)  # (batch, frame, joint * 2)
+            noise_est = torch.matmul(self.cfg.idct_m_all[:, :self.cfg.n_pre], noise)
+
+            predicted_noise_est = predicted_noise_est[:, self.cfg.t_his:, :]
+            noise_est = noise_est[:, self.cfg.t_his:, :]
+
+            loss2 = self.criterion(predicted_noise_est, noise_est)
+
+            # 最终的损失函数是两者的加权平均，再乘上conf的平均值
+            alpha = 0  # 超参数：加权平均系数
+            loss_total = (alpha * loss1 + (1 - alpha) * loss2) * traj_conf.mean()
 
             self.optimizer.zero_grad()
-            loss.backward()
+            loss_total.backward()
             self.optimizer.step()
 
             args_ema, ema, ema_model = self.ema_setup[0], self.ema_setup[1], self.ema_setup[2]
@@ -131,10 +143,10 @@ class Trainer:
             if args_ema is True:
                 ema.step_ema(ema_model, self.model)
 
-            self.train_losses.update(loss.item())
-            self.tb_logger.add_scalar('Loss/train', loss.item(), self.iter)
+            self.train_losses.update(loss_total.item())
+            self.tb_logger.add_scalar('Loss/train', loss_total.item(), self.iter)
 
-            del loss, traj, traj_dct, traj_dct_mod, traj_pad, traj_np
+            del loss_total, loss1, loss2, traj, traj_dct, traj_dct_mod, traj_pad, traj_np
 
     def after_train_step(self):
         # self.lr_scheduler.step()
@@ -147,7 +159,6 @@ class Trainer:
                                                                             # self.lrs[-1]))
                                                                             self.lr))
         if self.iter % self.cfg.save_gif_interval == 0:
-            # TODO: 做一下动画的骨架
             pose_gen = pose_generator(self.dataset['train'], self.model, self.diffusion, self.cfg, mode='gif')
             render_animation(self.dataset['train'].skeleton, pose_gen, ['HumanMAC'], self.cfg.t_his, ncol=4,
                              output=os.path.join(self.cfg.gif_dir, f'training_{self.iter}.gif'))

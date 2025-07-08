@@ -1,5 +1,5 @@
 dataset: 'xrf2'
-t_his: 75  # 历史帧
+t_his: 225  # 历史帧
 t_pred: 75  # 预测帧
 batch_size: 64
 num_epoch: 1001  # 有多少个epoch

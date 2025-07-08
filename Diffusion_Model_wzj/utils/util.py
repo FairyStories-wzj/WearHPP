@@ -6,8 +6,6 @@ import numpy as np
 
 
 def seed_set(seed):
-    # TODO: 把随机数改回来
-    # return None
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)

@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=43)  # 随机数种子
 
     parser.add_argument('--save_model_interval', type=int, default=10)  # 每隔几轮保存一次模型
-    parser.add_argument('--save_gif_interval', type=int, default=50)  # 每隔几轮画一次动画
+    parser.add_argument('--save_gif_interval', type=int, default=10)  # 每隔几轮画一次动画
 
     parser.add_argument('--ema', type=bool, default=True)  # 是否使用ema
     parser.add_argument('--vis_switch_num', type=int, default=10)  # 不知道是干什么的
