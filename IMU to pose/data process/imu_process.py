@@ -142,4 +142,3 @@ if __name__ == '__main__':
     imu_out_root = '/data/wangtiantian/pose/processed_data/imu'
     pose_out_root= '/data/wangtiantian/pose/processed_data/pose'
     align_imu_pose_all_scenes(imu_root, pose_root, imu_out_root, pose_out_root, scene_to_roomid)
-
