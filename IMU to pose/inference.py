@@ -6,7 +6,7 @@ from tqdm import tqdm
 from utils import reorder_imu, generate_modality_mask
 from imu_model import IMU2PoseNet_Fusion
 
-def infer_pose_only(
+def infer_pose(
     model_pth,
     imu_csv,
     start,
@@ -64,9 +64,9 @@ def infer_pose_only(
 if __name__ == '__main__':
     model_pth = "/data/wangtiantian/pose/result/best_ws75_st5_bs8_lr0.0001_hd256_dr0.1_maskright hand0.1-right pocket0.1-glasses0.1-left pocket0.1-left hand0.1_20250714_180616.pth"
     imu_csv = "/data/wangtiantian/pose/processed_data/imu/train/0_kitchen_1_imu.csv"
-    start, end = 10, 84  # 推理起始和结束帧
+    start, end = 10, 84  # 
 
-    pred_pose = infer_pose_only(
+    pred_pose = infer_pose(
         model_pth=model_pth,
         imu_csv=imu_csv,
         start=start,
