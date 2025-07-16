@@ -5,98 +5,74 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from utils import reorder_imu, generate_modality_mask,collate_fn, pose_loss, mpjpe
+# ==== 工具函数 ====
+def reorder_imu(df):
+    id_to_name = ['right hand', 'right pocket', 'glasses', 'left pocket', 'left hand']
+    device_names = {
+        'right hand':    ['right hand_加速度X', 'right hand_加速度Y', 'right hand_加速度Z', 'right hand_角速度X', 'right hand_角速度Y', 'right hand_角速度Z'],
+        'right pocket':  ['right pocket_加速度X', 'right pocket_加速度Y', 'right pocket_加速度Z', 'right pocket_角速度X', 'right pocket_角速度Y', 'right pocket_角速度Z'],
+        'glasses':       ['glasses_加速度X', 'glasses_加速度Y', 'glasses_加速度Z', 'glasses_角速度X', 'glasses_角速度Y', 'glasses_角速度Z'],
+        'left pocket':   ['left pocket_加速度X', 'left pocket_加速度Y', 'left pocket_加速度Z', 'left pocket_角速度X', 'left pocket_角速度Y', 'left pocket_角速度Z'],
+        'left hand':     ['left hand_加速度X', 'left hand_加速度Y', 'left hand_加速度Z', 'left hand_角速度X', 'left hand_角速度Y', 'left hand_角速度Z'],
+    }
+    select_cols = []
+    for device in id_to_name:
+        select_cols += device_names[device]
+    for col in select_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+    imu_data = df[select_cols].values.astype(np.float32)
+    imu_arr = imu_data.reshape(-1, 5, 6)
+    return imu_arr
 
-# ==== 数据集 ====
-class IMUPoseSeqDataset(Dataset):
-    def __init__(self, imu_dir, pose_dir, window_size=75, stride=5, mask_probs=None):
-        self.imu_files = sorted(glob.glob(os.path.join(imu_dir ,"*.csv")))
-        self.pose_files = sorted(glob.glob(os.path.join(pose_dir,"*.csv")))
-        self.win = window_size
-        self.stride = stride
-        self.mask_probs = mask_probs
-        self.index = []
-        for i in tqdm(range(len(self.imu_files))):
-            imu = pd.read_csv(self.imu_files[i])
-            pose = pd.read_csv(self.pose_files[i])
-            T = min(len(imu), len(pose))
-            for t in range(0, T-self.win+1, stride):
-                self.index.append((i, t))
+import numpy as np
 
-    def __len__(self): return len(self.index)
+def generate_modality_mask(mask_probs):
+    arr = np.array([mask_probs[name] for name in ['right hand', 'right pocket', 'glasses', 'left pocket', 'left hand']])
+    mask = np.random.rand(5) > arr
+    if mask.any():
+        return mask
+    else:
+        return generate_modality_mask(mask_probs)
 
-    def __getitem__(self, idx):
-        fi, t0 = self.index[idx]
-        imu_df = pd.read_csv(self.imu_files[fi]).iloc[t0:t0+self.win]
-        imu_arr = reorder_imu(imu_df)
-        msk = generate_modality_mask(self.mask_probs)
-        keep = np.where(msk)[0]
-        valid_imu = imu_arr[:, keep, :]  # [L, n_valid, 6]
-        pose_df = pd.read_csv(self.pose_files[fi]).iloc[t0:t0+self.win]
-        pose_seq = [np.array(ast.literal_eval(row), np.float32) for row in pose_df['keypoints']]
-        pose_arr = np.stack(pose_seq, axis=0)
-        return (
-            torch.from_numpy(valid_imu),
-            torch.from_numpy(pose_arr),
-            torch.tensor(keep)
-        )
-class IMU2PoseNet_Fusion(nn.Module):
-    def __init__(self, pose_dim=15, feat_dim=512, hidden_dim=256, dropout=0.1):
-        super().__init__()
-        self.encoder = DeviceBiLSTMEncoder(input_dim=6, hidden_dim=hidden_dim, output_dim=feat_dim, dropout=dropout)
-        self.device_fusion = DeviceFeatureTransformer(feat_dim=feat_dim, num_heads=4, num_layers=2, dropout=dropout)
-        self.pose_head = nn.Linear(feat_dim, 2 * pose_dim)
 
-    def forward(self, imu_batch, keep_batch, n_valid_list):
-        B, L, n_valid_max, _ = imu_batch.shape
-        # === 批量并行所有modal ===
-        imu_all = imu_batch.permute(0,2,1,3).reshape(B*n_valid_max, L, 6)
-        feat_all = self.encoder(imu_all)  # (B*n_valid_max, L, 512)
-        feats = feat_all.reshape(B, n_valid_max, L, 512).permute(0,2,1,3)  # [B, L, n_valid_max, 512]
-        # [B, L, n_valid_max, 512] → [B*L, n_valid_max, 512]
-        feats = feats.reshape(B*L, n_valid_max, 512)
-        key_padding_mask = (keep_batch == -1).unsqueeze(1).expand(B, L, n_valid_max).reshape(B*L, n_valid_max)
-        key_padding_mask = key_padding_mask.to(feats.device)
-        fused = self.device_fusion(feats, key_padding_mask)
-        fused = fused.reshape(B, L, n_valid_max, 512)
-        # === 只聚合有效通道 ===
-        feat_agg = []
-        for b in range(B):
-            n_valid = n_valid_list[b]
-            valid_indices = (keep_batch[b] != -1).nonzero(as_tuple=True)[0]
-            if n_valid == 0:
-                # 极端情况，全部丢失
-                agg = torch.zeros(L, 512, device=imu_batch.device)
-            else:
-                sample_feats = fused[b, :, valid_indices, :]  # (L, n_valid, 512)
-                agg = sample_feats.mean(dim=1)
-            feat_agg.append(agg)
-        feat_agg = torch.stack(feat_agg, dim=0)  # (B, L, 512)
-        pose_pred = self.pose_head(feat_agg).view(B, L, 15, 2)
-        return pose_pred
-class DeviceFeatureTransformer(nn.Module):
-    def __init__(self, feat_dim=512, num_heads=4, num_layers=2, dropout=0.1):
-        super().__init__()
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=feat_dim, nhead=num_heads, dropout=dropout,
-            batch_first=True, dim_feedforward=feat_dim*2,
-            norm_first=True, activation='gelu'
-        )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-    def forward(self, x, key_padding_mask=None):
-        # x: [B*L, n_valid_max, feat_dim]
-        x = self.transformer(x, src_key_padding_mask=key_padding_mask)
-        return x
-# ==== 模型部分（参数共享高效批量版） ====
-class DeviceBiLSTMEncoder(nn.Module):
-    def __init__(self, input_dim=6, hidden_dim=256, output_dim=512, dropout=0.1):
-        super().__init__()
-        self.bilstm = nn.LSTM(
-            input_dim, hidden_dim, num_layers=2,
-            batch_first=True, bidirectional=True, dropout=dropout
-        )
-        self.fc = nn.Linear(hidden_dim*2, output_dim)
-    def forward(self, x):  # x: (N, L, 6)
-        out, _ = self.bilstm(x)
-        out = self.fc(out)
-        return out  # (N, L, 512)
+
+
+def collate_fn(batch):
+    L = batch[0][0].shape[0]
+    B = len(batch)
+    n_valid_list = [b[0].shape[1] for b in batch]
+    n_valid_max = max(n_valid_list)
+    imu_batch = torch.zeros(B, L, n_valid_max, 6)
+    keep_batch = torch.full((B, n_valid_max), -1, dtype=torch.long)
+    pose_batch = torch.zeros(B, L, 15, 3)
+    for i, (imu, pose, keep) in enumerate(batch):
+        n_valid = imu.shape[1]
+        imu_batch[i, :, :n_valid, :] = imu
+        keep_batch[i, :n_valid] = keep
+        pose_batch[i] = pose
+    return imu_batch, pose_batch, keep_batch, n_valid_list
+# ==== 稳定loss和评估 ====
+def pose_loss(pred, gt):
+    xy_gt = gt[..., :2]
+    conf  = gt[..., 2]
+    mse = ((pred - xy_gt) ** 2).sum(dim=-1)
+    conf_sum = conf.sum()
+    if conf_sum < 1e-6:  # 没有有效标签
+        return torch.tensor(0.0, device=pred.device)
+    weighted = (mse * conf).sum() / (conf_sum + 1e-8)
+    if torch.isnan(weighted):  # 防nan
+        weighted = torch.tensor(0.0, device=pred.device)
+    return weighted
+
+def mpjpe(pred, gt, conf=None):
+    err = ((pred - gt) ** 2).sum(dim=-1).sqrt()
+    if conf is not None:
+        conf_sum = conf.sum()
+        if conf_sum < 1e-6:
+            return 0.0
+        mpjpe = (err * conf).sum() / (conf_sum + 1e-8)
+    else:
+        mpjpe = err.mean()
+    return mpjpe.item()
+
