@@ -89,6 +89,7 @@ class Trainer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             # self.iter = checkpoint['iter']
             # self.lr = checkpoint['lr']  # TODO：检查点中断重读的时候要把注释去掉
+            self.lr = self.cfg.lr
         else:
             self.lr = self.cfg.lr
             print("Start a new Diffusion Model...")
@@ -100,6 +101,7 @@ class Trainer:
             self.optimizer_imu2pose.load_state_dict(checkpoint['optimizer_state'])
             # self.iter = checkpoint['epoch']
             # self.lr_imu2pose = checkpoint['lr']
+            self.lr_imu2pose = 1e-4
         else:
             self.lr_imu2pose = 1e-4
             print("Start a new IMU2Pose Model...")
