@@ -3,14 +3,16 @@ t_his: 225  # 历史帧
 t_pred: 75  # 预测帧
 batch_size: 64
 num_epoch: 1001  # 有多少个epoch
-num_data_sample: 15000  # 每个epoch训练用多少组数据
-num_val_data_sample: 1500  # 每个epoch测试用多少组数据
+num_data_sample: 640  # 每个epoch训练用多少组数据
+num_val_data_sample: 64  # 每个epoch测试用多少组数据
 lr: 3.e-4  # 初始学习率
 lr_decay_every: 10  # 学习率多少轮下降一次
 lr_decay_rate: 0.9  # 学习率下降时的比率
 lr_limit: 1.e-6  # 学习率最低值
-train_path: E:/xrf2/train  # 训练集位置
-test_path: E:/xrf2/test  # 测试集位置
+train_path: E:/xrf2/train  # pose训练集位置
+test_path: E:/xrf2/test  # pose测试集位置
+train_path_imu: E:/xrf2/imu/train  # imu训练集的位置
+test_path_imu: E:/xrf2/imu/test  # imu测试集的位置
 
 # 以下参数建议不要改
 n_pre: 20  # DCT变换后的行数

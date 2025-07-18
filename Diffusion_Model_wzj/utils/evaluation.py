@@ -1,10 +1,10 @@
 import csv
 
 import pandas as pd
-from utils.metrics import *
+from Diffusion_Model_wzj.utils.metrics import *
 from tqdm import tqdm
-from utils import *
-from utils.script import sample_preprocessing
+from Diffusion_Model_wzj.utils import *
+from Diffusion_Model_wzj.utils.script import sample_preprocessing
 
 tensor = torch.tensor
 DoubleTensor = torch.DoubleTensor
@@ -21,7 +21,6 @@ def compute_stats(diffusion, multimodal_dict, model, logger, cfg):
     several (K=50) times.
     """
 
-    # TODO reduce computation complexity
     def get_prediction(data, model_select):
         traj_np = data[..., :, :].transpose([0, 2, 3, 1])
         traj = tensor(traj_np, device=cfg.device, dtype=torch.float32)
@@ -40,7 +39,7 @@ def compute_stats(diffusion, multimodal_dict, model, logger, cfg):
         traj_est = traj_est[None, ...]
         return traj_est
 
-    # TODO：为Xrf2制作一个评估数据提取器，返回对象包括
+    # 为Xrf2制作一个评估数据提取器，返回对象包括
     # 一个字典，包括'gt_group'，'data_group', 'num_samples'这三个键，它们的值分别是：
     # data_group: numpy数组，(samples, frame, joint, 2)，其中samples是采样的总数
     # gt_group: numpy张量，(samples, frame - t_his, (joint - 1) * 2)，data_group中只保留预测的部分、去掉0号关节、最后两维合并
@@ -58,7 +57,7 @@ def compute_stats(diffusion, multimodal_dict, model, logger, cfg):
 
     K = 50  # 目测应该是预测50次求平均，所以如果跑得慢的话这里调整一下
     pred = []
-    # print(gt_group)
+    print("正在出future pose：")
 
     for i in tqdm(range(0, K), position=0):
         # It generates a prediction for all samples in the test set

@@ -1,7 +1,7 @@
 import os
 import numpy as np
-from utils.pose_gen import pose_generator
-from utils.visualization import render_animation
+from Diffusion_Model_wzj.utils.pose_gen import pose_generator
+from Diffusion_Model_wzj.utils.visualization import render_animation
 
 
 def demo_visualize(mode, cfg, model, diffusion, dataset):

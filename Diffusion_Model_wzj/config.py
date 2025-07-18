@@ -56,7 +56,8 @@ class Config:
 
     def __init__(self, cfg_id, test=False):
         self.id = cfg_id
-        cfg_name = './cfg/%s.yml' % cfg_id
+        # cfg_name = './Diffusion_Model_wzj/cfg/%s.yml' % cfg_id
+        cfg_name = os.path.join(os.getcwd(),'Diffusion_Model_wzj', 'cfg', '%s.yml' % cfg_id)
         if not os.path.exists(cfg_name):
             print("Config file doesn't exist: %s" % cfg_name)
             exit(0)
@@ -89,6 +90,8 @@ class Config:
         self.data_candi_path = cfg['data_candi_path']
         self.train_path = cfg['train_path']
         self.test_path = cfg['test_path']
+        self.train_path_imu = cfg['train_path_imu']
+        self.test_path_imu = cfg['test_path_imu']
 
         self.padding = cfg['padding']
         self.Complete = cfg['Complete']

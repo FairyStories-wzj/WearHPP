@@ -36,8 +36,6 @@ def generate_modality_mask(mask_probs):
         return generate_modality_mask(mask_probs)
 
 
-
-
 def collate_fn(batch):
     L = batch[0][0].shape[0]
     B = len(batch)
@@ -56,6 +54,18 @@ def collate_fn(batch):
 def pose_loss(pred, gt):
     xy_gt = gt[..., :2]
     conf  = gt[..., 2]
+    mse = ((pred - xy_gt) ** 2).sum(dim=-1)
+    conf_sum = conf.sum()
+    if conf_sum < 1e-6:  # 没有有效标签
+        return torch.tensor(0.0, device=pred.device)
+    weighted = (mse * conf).sum() / (conf_sum + 1e-8)
+    if torch.isnan(weighted):  # 防nan
+        weighted = torch.tensor(0.0, device=pred.device)
+    return weighted
+
+def pose_loss_training(pred, gt, conf):  # 稍微改了一下输入
+    xy_gt = gt
+    conf = conf.squeeze(-1)
     mse = ((pred - xy_gt) ** 2).sum(dim=-1)
     conf_sum = conf.sum()
     if conf_sum < 1e-6:  # 没有有效标签

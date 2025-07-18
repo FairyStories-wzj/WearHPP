@@ -1,4 +1,4 @@
-from data_loader.skeleton import Skeleton
+from Diffusion_Model_wzj.data_loader.skeleton import Skeleton
 class Xrf2Skeleton(Skeleton):
     def __init__(self):
         parents = [-1,0,1,2,3,1,5,6,1,8,9,10,8,12,13,0,0,15,16,14,19,14,11,22,11]

@@ -23,22 +23,22 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # ==== 数据加载 ====
 train_set = IMUPoseSeqDataset(
-    imu_dir="/data/wangtiantian/pose/processed_data/imu/train",
-    pose_dir="/data/wangtiantian/pose/processed_data/pose/train",
+    imu_dir="E:\\Xrf2\\imu\\train",
+    pose_dir="E:\\Xrf2\\train",
     window_size=window_size, stride=stride, mask_probs=mask_probs)
 test_set = IMUPoseSeqDataset(
-    imu_dir="/data/wangtiantian/pose/processed_data/imu/test",
-    pose_dir="/data/wangtiantian/pose/processed_data/pose/test",
+    imu_dir="E:\\Xrf2\\imu\\test",
+    pose_dir="E:\\Xrf2\\test",
     window_size=window_size, stride=stride, mask_probs=mask_probs)
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, num_workers=4, pin_memory=True)
-test_loader  = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, num_workers=4, pin_memory=True)
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn, num_workers=0, pin_memory=True)
+test_loader  = DataLoader(test_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, num_workers=0, pin_memory=True)
 
 # ==== 训练 ====
 model = IMU2PoseNet_Fusion(pose_dim=15, feat_dim=512, hidden_dim=hidden_dim, dropout=dropout).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 import datetime
 
-save_dir = "/data/wangtiantian/pose/result/"
+save_dir = "E:\\Python Project\\WearHPP\\IMU to pose\\results"
 os.makedirs(save_dir, exist_ok=True)
 
 best_val_mpjpe = float('inf')
@@ -52,6 +52,7 @@ for epoch in range(num_epochs):
         imu_batch = imu_batch.float().to(device)
         pose_batch = pose_batch.float().to(device)
         pred = model(imu_batch, keep_batch, n_valid_list)
+        print(pred.shape)
         loss = pose_loss(pred, pose_batch)
         if torch.isnan(loss) or torch.isinf(loss):
             print("WARNING: loss is nan or inf, skip this batch!")

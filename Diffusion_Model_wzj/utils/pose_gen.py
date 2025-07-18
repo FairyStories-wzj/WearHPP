@@ -1,6 +1,8 @@
+import numpy as np
+import torch
 from torch import tensor
-from utils import *
-from utils.script import sample_preprocessing
+from Diffusion_Model_wzj.utils.script import sample_preprocessing
+from Diffusion_Model_wzj.utils.util import post_process
 
 
 def pose_generator(data_set, model_select, diffusion, cfg, mode=None,
@@ -23,7 +25,7 @@ def pose_generator(data_set, model_select, diffusion, cfg, mode=None,
             elif mode == 'pred':
                 data = data_set.sample_iter_action(action, cfg.dataset)
             elif mode == 'gif' or 'fix' in mode:
-                data = data_set.sample()
+                gt, imu, mean, std = data_set.sample(train_path_imu=cfg.train_path_imu, test_path_imu=cfg.test_path_imu, ckpt_imu=cfg.ckpt_imu)
             elif mode == 'zero_shot':
                 data = data_set[np.random.randint(0, data_set.shape[0])].copy()
                 data = np.expand_dims(data, axis=0)
@@ -31,12 +33,6 @@ def pose_generator(data_set, model_select, diffusion, cfg, mode=None,
                 data, joint_deleted = data_set.sample_conf()
             else:
                 raise NotImplementedError(f"unknown pose generator mode: {mode}")
-
-            # gt
-            gt = data[0].copy()
-            # gt[:, :1, :] = 0
-            # data[:, :, :1, :] = 0
-            # print(gt)
 
             if mode == 'switch':
                 poses = {}
@@ -46,10 +42,10 @@ def pose_generator(data_set, model_select, diffusion, cfg, mode=None,
                     poses['context'] = gt
                     poses['gt'] = gt
                 else:
-                    poses[f'HumanMAC_{draw_order_indicator + 1}'] = gt
-                    poses[f'HumanMAC_{draw_order_indicator + 2}'] = gt
-                gt = np.expand_dims(gt, axis=0)
-                traj_np = gt[..., :, :].reshape([gt.shape[0], cfg.t_his + cfg.t_pred, -1])
+                    poses[f'HumanMAC_{draw_order_indicator + 1}'] = imu
+                    poses[f'HumanMAC_{draw_order_indicator + 2}'] = imu
+                imu = np.expand_dims(imu, axis=0)
+                traj_np = imu[..., :, :].reshape([imu.shape[0], cfg.t_his + cfg.t_pred, -1])
 
             traj = tensor(traj_np, device=cfg.device, dtype=cfg.dtype)
 
@@ -75,4 +71,4 @@ def pose_generator(data_set, model_select, diffusion, cfg, mode=None,
             else:
                 draw_order_indicator = j + draw_order_indicator + 2 + 1
 
-        yield poses, joint_deleted  # 修改：有些关节不绘制
+        yield poses, joint_deleted, mean, std  # 修改：有些关节不绘制

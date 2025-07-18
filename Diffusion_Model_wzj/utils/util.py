@@ -31,7 +31,7 @@ def generate_pad(padding, t_his, t_pred):
 
 def padding_traj(traj, padding, idx_pad, zero_index):
     if padding == 'Zero':
-        traj_tmp = traj
+        traj_tmp = traj.clone()
         traj_tmp[..., zero_index, :] = 0
         traj_pad = traj_tmp[..., idx_pad, :]
     else:

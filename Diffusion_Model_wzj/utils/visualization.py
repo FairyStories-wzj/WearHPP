@@ -46,7 +46,7 @@ def render_animation(skeleton, poses_generator, algos, t_hist, fix_0=True, azim=
         fix_col = 'darkblue'
     else:
         fix_i = None
-    all_poses, joint_deleted = next(poses_generator)  # 修改：有些关节可以删除
+    all_poses, joint_deleted, mean, std = next(poses_generator)  # 修改：有些关节可以删除
     algo = algos[0] if len(algos) > 0 else next(iter(all_poses.keys()))
     t_total = next(iter(all_poses.values())).shape[0]
     poses = dict(filter(lambda x: x[0] in {'gt', 'context'} or algo == x[0].split('_')[0] or x[0].startswith('gt'),
@@ -71,8 +71,10 @@ def render_animation(skeleton, poses_generator, algos, t_hist, fix_0=True, azim=
         # ax.set_xlim3d([-radius / 2, radius / 2])
         # ax.set_zlim3d([0, radius])
         # ax.set_ylim3d([-radius / 2, radius / 2])
-        ax.set_xlim([-radius / 2, radius / 2])
-        ax.set_ylim([-radius / 2, radius / 2])
+        # ax.set_xlim([-radius / 2, radius / 2])
+        # ax.set_ylim([-radius / 2, radius / 2])
+        ax.set_xlim([0, 1500])
+        ax.set_ylim([0, 1500])
         ax.set_xticks([])
         ax.set_yticks([])
         # ax.set_xticklabels([])
@@ -138,10 +140,12 @@ def render_animation(skeleton, poses_generator, algos, t_hist, fix_0=True, azim=
 
             trajectories[n] = poses[n][:, 0, [0, 1]]  # shape: [Frame, 2]
             # x_center, y_center = trajectories[n][i, 0] * global_max, trajectories[n][i, 1] * global_max
-            x_center, y_center = 0, 0
+            # x_center, y_center = 0, 0
 
-            ax.set_xlim([-radius / 2 + x_center, radius / 2 + x_center])
-            ax.set_ylim([-radius / 2 + y_center, radius / 2 + y_center])
+            # ax.set_xlim([-radius / 2 + x_center, radius / 2 + x_center])
+            # ax.set_ylim([-radius / 2 + y_center, radius / 2 + y_center])
+            ax.set_xlim([0, 1500])
+            ax.set_ylim([0, 1500])
 
             # ax.plot([0, 0.1],
             #         [0, 0],
@@ -177,8 +181,8 @@ def render_animation(skeleton, poses_generator, algos, t_hist, fix_0=True, azim=
                     #                                [pos[j, 1], pos[j_parent, 1]],
                     #                                [pos[j, 2], pos[j_parent, 2]], zdir='z', c=fix_col, linewidth=3.0))
                     # else:
-                    lines_2d[n].append(ax.plot([pos[j, 0], pos[j_parent, 0]],
-                                               [pos[j, 1], pos[j_parent, 1]],
+                    lines_2d[n].append(ax.plot([pos[j, 0] * std[j][0] + mean[j][0], pos[j_parent, 0] * std[j_parent][0] + mean[j_parent][0]],
+                                               [pos[j, 1] * std[j][1] + mean[j][1], pos[j_parent, 1] * std[j_parent][1] + mean[j_parent][1]],
                                                c=col, linewidth=1.0))
                     # if n == 0:
                     # if j == 1:
@@ -233,8 +237,9 @@ def render_animation(skeleton, poses_generator, algos, t_hist, fix_0=True, azim=
                     #     col = fix_col
 
                     pos = poses[n][i]
-                    x_array = np.array([pos[j, 0], pos[j_parent, 0]])
-                    y_array = np.array([pos[j, 1], pos[j_parent, 1]])
+                    x_array = np.array([pos[j, 0] * std[j][0] + mean[j][0], pos[j_parent, 0] * std[j_parent][0] + mean[j_parent][0]])
+                    y_array = np.array([pos[j, 1] * std[j][1] + mean[j][1], pos[j_parent, 1] * std[j_parent][1] + mean[j_parent][1]])
+                    # print(x_array, y_array)
                     # z_array = np.array([pos[j, 2], pos[j_parent, 2]])
                     # lines_2d[n][j - 1][0].set_data_3d(x_array, y_array, z_array)
                     lines_2d[n][j - 1][0].set_data(x_array, y_array)

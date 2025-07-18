@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from utils import reorder_imu, generate_modality_mask,collate_fn, pose_loss, mpjpe
+from IMU_to_pose.utils import reorder_imu, generate_modality_mask,collate_fn, pose_loss, mpjpe
 
 # ==== 数据集 ====
 class IMUPoseSeqDataset(Dataset):
